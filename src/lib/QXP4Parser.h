@@ -119,7 +119,7 @@ private:
   void readTextSettings(const std::shared_ptr<librevenge::RVNGInputStream> &stream, TextSettings &settings);
   void readTextPathSettings(const std::shared_ptr<librevenge::RVNGInputStream> &stream, TextPathSettings &settings);
   void readOleObject(const std::shared_ptr<librevenge::RVNGInputStream> &stream);
-  void readPictureSettings(const std::shared_ptr<librevenge::RVNGInputStream> &stream, std::shared_ptr<PictureBox> &picturebox);
+  void readPictureSettings(const std::shared_ptr<librevenge::RVNGInputStream> &stream, std::shared_ptr<PictureBox> &picturebox, uint32_t &sourceID);
   void readImageData(const std::shared_ptr<librevenge::RVNGInputStream> &stream);
   void readBezierData(const std::shared_ptr<librevenge::RVNGInputStream> &stream, std::vector<CurveComponent> &curveComponents, Rect &bbox);
   void skipTextObjectEnd(const std::shared_ptr<librevenge::RVNGInputStream> &stream, const ObjectHeader &header, const LinkedTextSettings &linkedTextSettings);

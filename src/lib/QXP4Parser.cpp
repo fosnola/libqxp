@@ -10,6 +10,7 @@
 #include "QXP4Parser.h"
 
 #include <librevenge-stream/librevenge-stream.h>
+#include <iostream>
 #include <memory>
 
 #include "QXP4Deobfuscator.h"
@@ -464,6 +465,7 @@ Page QXP4Parser::parsePage(const std::shared_ptr<librevenge::RVNGInputStream> &s
 
 void QXP4Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> &stream, QXP4Deobfuscator &deobfuscate, QXPCollector &collector, const Page &page, const unsigned index)
 {
+  //std::cout << std::hex << stream->tell() << std::dec << "\n";
   const auto header = parseObjectHeader(stream, deobfuscate);
 
   switch (header.contentType)
@@ -751,15 +753,16 @@ void QXP4Parser::parseBezierPictureBox(const std::shared_ptr<librevenge::RVNGInp
     box->fill = readGradient(stream, header.color);
   }
 
-  readPictureSettings(stream, box);
+  uint32_t sid;
+  readPictureSettings(stream, box, sid);
 
   skip(stream, 76);
 
-  if (header.contentIndex != 0 && header.oleId == 0)
+  readBezierData(stream, box->curveComponents, box->boundingBox);
+  if (header.contentIndex != 0 && sid != 0)
   {
     readImageData(stream);
   }
-  readBezierData(stream, box->curveComponents, box->boundingBox);
 
   collector.collectPictureBox(box);
 
@@ -789,15 +792,21 @@ void QXP4Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStre
     picturebox->fill = readGradient(stream, header.color);
   }
 
-  readPictureSettings(stream, picturebox);
+  uint32_t sid;
+  readPictureSettings(stream, picturebox, sid);
 
-  skip(stream, 76);
+  skip(stream, 52);
+  uint32_t pid=readU32(stream, be);
+  skip(stream, 20);
 
-  if (header.contentIndex != 0 && header.oleId == 0)
+  if (pid != 0)
+  {
+    readBezierData(stream, picturebox->curveComponents, picturebox->boundingBox);
+  }
+  if (header.contentIndex != 0 && sid != 0)
   {
     readImageData(stream);
   }
-
   collector.collectPictureBox(picturebox);
 
   if (header.contentIndex) parsePicture(header.contentIndex, collector);
@@ -995,6 +1004,7 @@ void QXP4Parser::parseGroup(const std::shared_ptr<librevenge::RVNGInputStream> &
   }
   skip(stream, 10);
 
+  //std::cout << "Group:" << std::hex << stream->tell() << std::dec << "\n";
   readGroupElements(stream, count, page.objectsCount, index, group->objectsIndexes);
 
   collector.collectGroup(group);
@@ -1099,9 +1109,11 @@ void QXP4Parser::readOleObject(const std::shared_ptr<librevenge::RVNGInputStream
   skip(stream, length);
 }
 
-void QXP4Parser::readPictureSettings(const std::shared_ptr<librevenge::RVNGInputStream> &stream, std::shared_ptr<PictureBox> &picturebox)
+void QXP4Parser::readPictureSettings(const std::shared_ptr<librevenge::RVNGInputStream> &stream, std::shared_ptr<PictureBox> &picturebox, uint32_t &sourceID)
 {
-  skip(stream, 24);
+  skip(stream, 4);
+  sourceID=readU32(stream, be);
+  skip(stream, 16);
   picturebox->pictureRotation = readFraction(stream, be);
   picturebox->pictureSkew = readFraction(stream, be);
   picturebox->offsetLeft = readFraction(stream, be);
@@ -1124,6 +1136,8 @@ void QXP4Parser::readBezierData(const std::shared_ptr<librevenge::RVNGInputStrea
     QXP_DEBUG_MSG(("Invalid bezier data length %ul\n", length));
     throw ParseError();
   }
+  if (length == 0)
+    return;
   const unsigned long start = stream->tell();
   const unsigned long end = start + length;
 

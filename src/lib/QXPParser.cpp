@@ -284,16 +284,12 @@ std::vector<PageSettings> QXPParser::parsePageSettings(const std::shared_ptr<lib
     skip(stream, m_header->version() >= QXP_4 ? 12 : 8);
   }
 
-  for (unsigned i = 0; i < 2*count+2; ++i)
+  for (unsigned i = 0; i < 2*count+2+(be ? 0 : 1); ++i)
   {
     const unsigned length = readU32(stream, be);
     skip(stream, length);
   }
 
-  if (!be)
-  {
-    skip(stream, 4);
-  }
   const unsigned nameLength = readU32(stream, be);
   skip(stream, nameLength);
 
@@ -330,10 +326,10 @@ void QXPParser::parsePicture(unsigned index, QXPCollector &collector)
           if (signature==0x4d42)   // BM
           {
             uint32_t realPictSize=readU32(pictureStream, be);
-            ok=realPictSize<=pictSize+0x2e;
+            ok=realPictSize<=pictSize; // normally less than pictSize-0x2e but sometimes pictSize
             if (ok)
             {
-              pictSize=realPictSize;
+              pictSize=realPictSize+0x2e<=pictSize ? realPictSize : pictSize-0x2e;
               pictureStream->seek(0x32, librevenge::RVNG_SEEK_SET);
             }
           }
