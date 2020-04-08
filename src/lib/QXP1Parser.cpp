@@ -34,21 +34,15 @@ double getShade(const unsigned shadeId)
     return 1.0;
 }
 
-#if 0
 template<typename T>
 shared_ptr<T> createBox(const QXP1Parser::ObjectHeader &header)
 {
   auto box = make_shared<T>();
   box->boundingBox = header.boundingBox;
-  box->runaround = header.runaround;
   box->boxType = header.boxType;
   box->fill = header.fill;
-  box->cornerType = header.cornerType;
-  box->cornerRadius = header.cornerRadius;
-  box->rotation = header.rotation;
   return box;
 }
-#endif
 
 template<typename T>
 shared_ptr<T> createLine(const QXP1Parser::ObjectHeader &header)
@@ -252,14 +246,16 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
   const unsigned shadeId = readU8(input);
   const unsigned colorId = readU8(input);
   const auto &color = getColor(colorId).applyShade(getShade(shadeId));
+
   if (type<2 || !transparent)
   {
     object.fill = color;
   }
+
   switch (object.shapeType)
   {
-  case ShapeType::LINE: // line
-  case ShapeType::ORTHOGONAL_LINE: // ortho line
+  case ShapeType::LINE:
+  case ShapeType::ORTHOGONAL_LINE:
     parseLine(input, collector, object);
     break;
   case ShapeType::RECTANGLE:
@@ -313,16 +309,26 @@ void QXP1Parser::parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &i
   skip(input, 3);
 }
 
-void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
+void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &stream, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
 {
-  (void) collector;
-  (void) header;
-
-  skip(input, 28);
+  auto textbox = createBox<TextBox>(header);
+  textbox->linkSettings.linkId = header.linkIndex;
+  textbox->linkSettings.offsetIntoText = header.textOffset;
+  textbox->frame = readFrame(stream);
+  textbox->settings.columnsCount = readU8(stream);
+  skip(stream, 5); // 0: column separator[4], 4: 0|40[1]
+  textbox->settings.inset.top =
+    textbox->settings.inset.left =
+      textbox->settings.inset.right =
+        textbox->settings.inset.bottom = readFraction(stream, true);
+  skip(stream, 1); // 0: 0[1]
+  textbox->linkSettings.nextLinkedIndex = readU16(stream, be);
+  skip(stream, 9);
   if (header.linkIndex==0)
-    skip(input, 3);
+    skip(stream, 3);
   if (header.contentIndex==0)
-    skip(input, 12);
+    skip(stream, 12);
+  collector.collectTextBox(textbox);
 }
 
 void QXP1Parser::parsePicture(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
@@ -347,6 +353,23 @@ void QXP1Parser::parseCoordPair(const std::shared_ptr<librevenge::RVNGInputStrea
   QXP1Parser::adjust(x1, x1Adj);
   QXP1Parser::adjust(y2, y2Adj);
   QXP1Parser::adjust(x2, x2Adj);
+}
+
+Frame QXP1Parser::readFrame(const std::shared_ptr<librevenge::RVNGInputStream> &stream)
+{
+  Frame frame;
+  skip(stream, 1);
+  frame.width = double(readU16(stream, true))/double(0x8000);
+  const double shade = readU8(stream);
+  const unsigned colorId = readU8(stream);
+  frame.color = getColor(colorId).applyShade(shade);
+  const unsigned styleIndex = readU8(stream);
+  const bool isStripe = (styleIndex >> 7) == 1;
+  if (isStripe)
+    frame.lineStyle = getLineStyle(styleIndex);
+  else
+    frame.width=0;
+  return frame;
 }
 
 }

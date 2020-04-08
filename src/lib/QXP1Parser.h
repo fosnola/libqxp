@@ -71,6 +71,7 @@ private:
   void parsePicture(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header);
 
   void parseCoordPair(const std::shared_ptr<librevenge::RVNGInputStream> &input, double &x1, double &y1, double &x2, double &y2);
+  Frame readFrame(const std::shared_ptr<librevenge::RVNGInputStream> &stream);
 
 private:
   const std::shared_ptr<QXP1Header> m_header;
