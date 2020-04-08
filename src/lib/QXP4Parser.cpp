@@ -738,6 +738,7 @@ void QXP4Parser::parseEmptyBox(const std::shared_ptr<librevenge::RVNGInputStream
 void QXP4Parser::parseBezierPictureBox(const std::shared_ptr<librevenge::RVNGInputStream> &stream, const QXP4Parser::ObjectHeader &header, QXPCollector &collector)
 {
   auto box = createBox<PictureBox>(header);
+  box->contentIndex=header.contentIndex;
 
   box->frame = readFrame(stream);
   skip(stream, 4);
@@ -759,15 +760,17 @@ void QXP4Parser::parseBezierPictureBox(const std::shared_ptr<librevenge::RVNGInp
   {
     readImageData(stream);
   }
-
   readBezierData(stream, box->curveComponents, box->boundingBox);
 
-  collector.collectBox(box);
+  collector.collectPictureBox(box);
+
+  if (header.contentIndex) parsePicture(header.contentIndex, collector);
 }
 
 void QXP4Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStream> &stream, const QXP4Parser::ObjectHeader &header, QXPCollector &collector)
 {
   auto picturebox = createBox<PictureBox>(header);
+  picturebox->contentIndex=header.contentIndex;
 
   picturebox->frame = readFrame(stream);
   skip(stream, 4);
@@ -796,7 +799,9 @@ void QXP4Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStre
     readImageData(stream);
   }
 
-  collector.collectBox(picturebox);
+  collector.collectPictureBox(picturebox);
+
+  if (header.contentIndex) parsePicture(header.contentIndex, collector);
 }
 
 void QXP4Parser::parseLineText(const std::shared_ptr<librevenge::RVNGInputStream> &stream, const QXP4Parser::ObjectHeader &header, QXPCollector &collector)

@@ -43,6 +43,9 @@ public:
 
   void collectLine(const std::shared_ptr<Line> &line) override;
   void collectBox(const std::shared_ptr<Box> &box) override;
+
+  void collectPicture(unsigned index, librevenge::RVNGBinaryData const &pict) override;
+  void collectPictureBox(const std::shared_ptr<PictureBox> &box) override;
   void collectTextBox(const std::shared_ptr<TextBox> &box) override;
   void collectTextPath(const std::shared_ptr<TextPath> &textPath) override;
   void collectGroup(const std::shared_ptr<Group> &group) override;
@@ -130,6 +133,7 @@ private:
 
   std::vector<CollectedPage> m_unprocessedPages;
 
+  std::unordered_map<unsigned, librevenge::RVNGBinaryData> m_indexPictureDataMap;
   std::unordered_map<unsigned, std::shared_ptr<Text>> m_linkTextMap;
   std::unordered_map<unsigned, std::unordered_map<unsigned, std::shared_ptr<TextObject>>> m_linkIndexedTextObjectsMap;
 
@@ -154,6 +158,7 @@ private:
 
   void drawLine(const std::shared_ptr<Line> &line, const CollectedPage &page);
   void drawBox(const std::shared_ptr<Box> &box, const CollectedPage &page);
+  void drawPictureBox(const std::shared_ptr<PictureBox> &box, const CollectedPage &page);
   void drawRectangle(const std::shared_ptr<Box> &box, const CollectedPage &page);
   void drawOval(const std::shared_ptr<Box> &oval, const CollectedPage &page);
   void drawPolygon(const std::shared_ptr<Box> &polygon, const CollectedPage &page);

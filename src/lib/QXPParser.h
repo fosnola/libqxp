@@ -84,6 +84,7 @@ protected:
 
   std::vector<PageSettings> parsePageSettings(const std::shared_ptr<librevenge::RVNGInputStream> &stream);
 
+  void parsePicture(unsigned index, QXPCollector &collector);
   std::shared_ptr<Text> parseText(unsigned index, unsigned linkId, QXPCollector &collector);
 
   uint32_t readRecordEndOffset(const std::shared_ptr<librevenge::RVNGInputStream> &stream);

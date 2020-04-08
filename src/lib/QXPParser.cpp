@@ -300,6 +300,35 @@ std::vector<PageSettings> QXPParser::parsePageSettings(const std::shared_ptr<lib
   return pages;
 }
 
+void QXPParser::parsePicture(unsigned index, QXPCollector &collector)
+{
+  if (!index || !be) // the Windows picture format is not understood
+    return;
+  try
+  {
+    auto pictureStream = m_blockParser.getChain(index);
+    if (pictureStream)
+    {
+      uint32_t pictSize=readU32(pictureStream, be);
+      const unsigned char *readData;
+      unsigned long sizeRead;
+      if (pictSize<10 || (readData=pictureStream->read(static_cast<unsigned long>(pictSize), sizeRead)) == nullptr || long(sizeRead)!=pictSize)
+      {
+        QXP_DEBUG_MSG(("Failed to read picture %u\n", index));
+        return;
+      }
+
+      librevenge::RVNGBinaryData data;
+      data.append(readData, sizeRead);
+      collector.collectPicture(index, data);
+    }
+  }
+  catch (...)
+  {
+    QXP_DEBUG_MSG(("Failed to parse picture %u\n", index));
+  }
+}
+
 std::shared_ptr<Text> QXPParser::parseText(unsigned index, unsigned linkId, QXPCollector &collector)
 {
   try

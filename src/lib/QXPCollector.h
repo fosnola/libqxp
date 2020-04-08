@@ -19,6 +19,7 @@ struct Box;
 struct Group;
 struct Line;
 struct Page;
+struct PictureBox;
 struct QXPDocumentProperties;
 struct Text;
 struct TextBox;
@@ -44,6 +45,8 @@ public:
 
   virtual void collectLine(const std::shared_ptr<Line> &) { }
   virtual void collectBox(const std::shared_ptr<Box> &) { }
+  virtual void collectPicture(unsigned, librevenge::RVNGBinaryData const &) {}
+  virtual void collectPictureBox(const std::shared_ptr<PictureBox> &) { }
   virtual void collectTextBox(const std::shared_ptr<TextBox> &) { }
   virtual void collectTextPath(const std::shared_ptr<TextPath> &) { }
   virtual void collectGroup(const std::shared_ptr<Group> &) { }

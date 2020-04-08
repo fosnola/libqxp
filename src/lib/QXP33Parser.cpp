@@ -632,6 +632,7 @@ void QXP33Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStr
   }
 
   auto picturebox = createBox<PictureBox>(header);
+  picturebox->contentIndex=header.contentIndex;
   picturebox->frame = frame;
 
   picturebox->pictureRotation = readFraction(stream, be);
@@ -667,7 +668,9 @@ void QXP33Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStr
     skip(stream, rlength);
   }
 
-  collector.collectBox(picturebox);
+  collector.collectPictureBox(picturebox);
+
+  if (header.contentIndex) parsePicture(header.contentIndex, collector);
 }
 
 void QXP33Parser::parseEmptyBox(const std::shared_ptr<librevenge::RVNGInputStream> &stream, const QXP33Parser::ObjectHeader &header, QXPCollector &collector)

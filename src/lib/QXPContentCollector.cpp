@@ -298,6 +298,7 @@ QXPContentCollector::QXPContentCollector(librevenge::RVNGDrawingInterface *paint
   , m_isCollectingFacingPage(false)
   , m_currentObjectIndex(0)
   , m_unprocessedPages()
+  , m_indexPictureDataMap()
   , m_linkTextMap()
   , m_linkIndexedTextObjectsMap()
   , m_docProps()
@@ -368,6 +369,16 @@ void QXPContentCollector::collectLine(const std::shared_ptr<Line> &line)
 void QXPContentCollector::collectBox(const std::shared_ptr<Box> &box)
 {
   addObject<Box>(box, &QXPContentCollector::drawBox);
+}
+
+void QXPContentCollector::collectPictureBox(const std::shared_ptr<PictureBox> &box)
+{
+  addObject<PictureBox>(box, &QXPContentCollector::drawPictureBox);
+}
+
+void QXPContentCollector::collectPicture(unsigned index, librevenge::RVNGBinaryData const &pict)
+{
+  m_indexPictureDataMap[index] = pict;
 }
 
 void QXPContentCollector::collectTextBox(const std::shared_ptr<TextBox> &textbox)
@@ -596,6 +607,34 @@ void QXPContentCollector::drawBox(const std::shared_ptr<Box> &box, const QXPCont
   case BoxType::BEZIER:
     drawBezierBox(box, page);
     break;
+  }
+}
+
+void QXPContentCollector::drawPictureBox(const std::shared_ptr<PictureBox> &box, const QXPContentCollector::CollectedPage &page)
+{
+  drawBox(box, page);
+  if (box->contentIndex)
+  {
+    auto const &it=m_indexPictureDataMap.find(box->contentIndex);
+    if (it!=m_indexPictureDataMap.end())
+    {
+      librevenge::RVNGPropertyList propList;
+      writeFill(propList, box->fill);
+      writeFrame(propList, box->frame, box->runaround);
+      m_painter->setStyle(propList);
+
+      propList.clear();
+      const auto bbox = box->boundingBox;
+      propList.insert("svg:x",page.getX(bbox.left), librevenge::RVNG_POINT);
+      propList.insert("svg:y",page.getY(bbox.top), librevenge::RVNG_POINT);
+      propList.insert("svg:width", double(bbox.width()), librevenge::RVNG_POINT);
+      propList.insert("svg:height", double(bbox.height()), librevenge::RVNG_POINT);
+
+      propList.insert("librevenge:mime-type", "image/pict");
+      propList.insert("office:binary-data", it->second);
+      writeZIndex(propList, box->zIndex+1);
+      m_painter->drawGraphicObject(propList);
+    }
   }
 }
 
