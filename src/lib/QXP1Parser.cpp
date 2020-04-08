@@ -212,18 +212,14 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
     break;
   case 4:
     object.shapeType = ShapeType::RECTANGLE;
-    object.contentType = ContentType::NONE;
+    object.contentType = ContentType::PICTURE;
     break;
   case 5:
     object.shapeType = ShapeType::CORNERED_RECTANGLE;
-    object.contentType = ContentType::NONE;
+    object.contentType = ContentType::PICTURE;
     break;
   case 6:
     object.shapeType = ShapeType::OVAL;
-    object.contentType = ContentType::NONE;
-    break;
-  case 7:
-    object.shapeType = ShapeType::RECTANGLE;
     object.contentType = ContentType::PICTURE;
     break;
   default:
@@ -252,28 +248,26 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
     object.fill = color;
   }
 
+  unsigned lastObject;
   switch (object.shapeType)
   {
   case ShapeType::LINE:
   case ShapeType::ORTHOGONAL_LINE:
-    parseLine(input, collector, object);
+    parseLine(input, collector, object, lastObject);
     break;
   case ShapeType::RECTANGLE:
-    if (object.contentType == ContentType::TEXT)
-      parseText(input, collector, object);
-    else
-      parsePicture(input, collector, object);
-    break;
   case ShapeType::CORNERED_RECTANGLE:
   case ShapeType::OVAL:
-    parsePicture(input, collector, object);
+    if (object.contentType == ContentType::TEXT)
+      parseText(input, collector, object, lastObject);
+    else
+      parsePictureBox(input, collector, object, lastObject);
     break;
   default:
     QXP_DEBUG_MSG(("QXP1Parser::parseObject: unknown object type %d, cannot continue\n", type));
     throw ParseError();
   }
 
-  const unsigned lastObject = readU8(input);
   switch (lastObject)
   {
   case 0:
@@ -287,29 +281,31 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
   }
 }
 
-void QXP1Parser::parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
+void QXP1Parser::parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &stream, QXPCollector &collector, QXP1Parser::ObjectHeader const &header, unsigned &lastObject)
 {
   auto line = createLine<Line>(header);
 
   Rect &bbox = line->boundingBox;
-  parseCoordPair(input, bbox.left, bbox.top, bbox.right, bbox.bottom);
-  skip(input, 2); // 1?
-  line->style.width = double(readU16(input, true))/double(0x8000);
-  const unsigned styleIndex = readU8(input);
+  parseCoordPair(stream, bbox.left, bbox.top, bbox.right, bbox.bottom);
+  skip(stream, 2); // 1?
+  line->style.width = double(readU16(stream, true))/double(0x8000);
+  const unsigned styleIndex = readU8(stream);
   const bool isStripe = (styleIndex >> 7) == 1;
   if (!isStripe)
   {
     line->style.lineStyle = getLineStyle(styleIndex);
   }
 
-  const uint8_t arrowType = readU8(input);
+  const uint8_t arrowType = readU8(stream);
   setArrow(arrowType, line->style);
   collector.collectLine(line);
 
-  skip(input, 3);
+  skip(stream, 3);
+
+  lastObject = readU8(stream);
 }
 
-void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &stream, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
+void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &stream, QXPCollector &collector, QXP1Parser::ObjectHeader const &header, unsigned &lastObject)
 {
   auto textbox = createBox<TextBox>(header);
   textbox->linkSettings.linkId = header.linkIndex;
@@ -329,14 +325,36 @@ void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &s
   if (header.contentIndex==0)
     skip(stream, 12);
   collector.collectTextBox(textbox);
+
+  lastObject = readU8(stream);
 }
 
-void QXP1Parser::parsePicture(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
+void QXP1Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStream> &stream, QXPCollector &collector, QXP1Parser::ObjectHeader const &header, unsigned &lastObject)
 {
-  (void) collector;
-  (void) header;
+  auto picturebox = createBox<PictureBox>(header);
+  picturebox->contentIndex=header.contentIndex;
+  picturebox->frame = readFrame(stream);
+  skip(stream, 5); // 0: column count, 1: column separator[4]
+  picturebox->scaleHor = readFraction(stream, true);
+  picturebox->scaleVert = readFraction(stream, true);
+  skip(stream, 4); // 0
+  auto index=readU32(stream, true);
+  skip(stream, 18); // then 1,0,1,0,0x24,0,0
+  lastObject = readU8(stream);
 
-  skip(input, 45);
+  if (index)
+  {
+    for (int i=0; i<2; ++i)
+    {
+      auto sz=readU16(stream, true);
+      if (sz)
+        skip(stream, sz);
+    }
+  }
+  collector.collectPictureBox(picturebox);
+
+  if (header.contentIndex)
+    parsePicture(header.contentIndex, collector);
 }
 
 void QXP1Parser::parseCoordPair(const std::shared_ptr<librevenge::RVNGInputStream> &input, double &x1, double &y1, double &x2, double &y2)

@@ -66,9 +66,9 @@ private:
   bool parsePage(const std::shared_ptr<librevenge::RVNGInputStream> &input);
   bool parseObject(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector);
 
-  void parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header);
-  void parseText(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header);
-  void parsePicture(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header);
+  void parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header, unsigned &lastObject);
+  void parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header, unsigned &lastObject);
+  void parseText(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header, unsigned &lastObject);
 
   void parseCoordPair(const std::shared_ptr<librevenge::RVNGInputStream> &input, double &x1, double &y1, double &x2, double &y2);
   Frame readFrame(const std::shared_ptr<librevenge::RVNGInputStream> &stream);
