@@ -1058,9 +1058,19 @@ void QXPContentCollector::drawText(const std::shared_ptr<Text> &text, const Link
         writeTextPosition(spanPropList, offset + charFormat.format->baselineShift, m_docProps.superiorVScale);
         spanPropList.insert("style:text-scale", m_docProps.superiorHScale, librevenge::RVNG_PERCENT);
       }
-      else if (charFormat.format->baselineShift != 0.0)
+      else
       {
-        writeTextPosition(spanPropList, charFormat.format->baselineShift);
+        if (charFormat.format->horizontalScaling<1 || charFormat.format->horizontalScaling>1)
+        {
+          // the horizontalScaling only applies to characters and not space between two characters
+          // so divides it by two...
+          spanPropList.insert("style:text-scale", charFormat.format->horizontalScaling < 0.2 ? 0.6 : charFormat.format->horizontalScaling > 2 ? 1.5 : 1+0.5*(charFormat.format->horizontalScaling-1), librevenge::RVNG_PERCENT);
+        }
+
+        if (charFormat.format->baselineShift != 0.0)
+        {
+          writeTextPosition(spanPropList, charFormat.format->baselineShift);
+        }
       }
 
       if (paragraph.format->hj)

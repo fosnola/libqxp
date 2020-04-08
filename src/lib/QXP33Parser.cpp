@@ -176,9 +176,7 @@ CharFormat QXP33Parser::parseCharFormat(const std::shared_ptr<librevenge::RVNGIn
 
   CharFormat result;
   parseCommonCharFormatProps(stream, result);
-
-  skip(stream, 4);
-
+  result.horizontalScaling=readFraction(stream, be);
   const unsigned colorId = readU8(stream);
 
   skip(stream, 1);
