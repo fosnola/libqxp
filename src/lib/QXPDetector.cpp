@@ -44,10 +44,8 @@ public:
   {
     switch (m_version)
     {
-#ifdef DEBUG
     case QXPVersion::QXP_1:
       return std::make_shared<QXP1Header>();
-#endif
     case QXPVersion::QXP_31_MAC:
     case QXPVersion::QXP_31:
     case QXPVersion::QXP_33:
@@ -131,11 +129,15 @@ void QXPDetector::detect(const std::shared_ptr<librevenge::RVNGInputStream> &inp
     if (vers==QXP_1 && readU16(docStream, true)==vers)
     {
       m_header = std::make_shared<QXP1Header>();
-      // check if we can retrieve the block parser
+      // detection is very weak, check if we can retrieve the main
+      // block parser and if it is long enough
       docStream->seek(0, librevenge::RVNG_SEEK_SET);
       m_header->load(docStream);
       QXPBlockParser blockParser(docStream, m_header);
-      if (!blockParser.getChain(3))
+      auto mainStream=blockParser.getChain(3);
+      if (mainStream)
+        mainStream->seek(200, librevenge::RVNG_SEEK_SET); // ~ 194=two empty master page data
+      if (!mainStream || mainStream->tell()<190)
         m_header.reset();
       else
         m_input=docStream;

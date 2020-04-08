@@ -350,10 +350,10 @@ void QXPContentCollector::startPage(const Page &page)
   m_currentObjectIndex = 0;
 }
 
-void QXPContentCollector::endPage()
+void QXPContentCollector::endPage(bool reverseZIndex)
 {
   if (!m_unprocessedPages.empty())
-    draw();
+    draw(false, reverseZIndex);
 }
 
 void QXPContentCollector::collectDocumentProperties(const QXPDocumentProperties &props)
@@ -438,7 +438,7 @@ QXPContentCollector::CollectedPage &QXPContentCollector::getInsertionPage(const 
   return m_unprocessedPages.back();
 }
 
-void QXPContentCollector::draw(bool force)
+void QXPContentCollector::draw(bool force, bool reverseZIndex)
 {
   updateLinkedTexts();
 
@@ -460,12 +460,25 @@ void QXPContentCollector::draw(bool force)
 
     {
       unsigned i = 0;
-      for (auto &obj : boost::adaptors::reverse(page.objects))
+      if (reverseZIndex)
       {
-        obj.second->setZIndex(i);
-        // we can't just increment by 1 because some objects may need to create several elements (such as box + text)
-        // also we can't just have a counter instead of this field because groups may not be consecutive
-        i += 100;
+        for (auto &obj : boost::adaptors::reverse(page.objects))
+        {
+          obj.second->setZIndex(i);
+          // we can't just increment by 1 because some objects may need to create several elements (such as box + text)
+          // also we can't just have a counter instead of this field because groups may not be consecutive
+          i += 100;
+        }
+      }
+      else
+      {
+        for (auto &obj : page.objects)
+        {
+          obj.second->setZIndex(i);
+          // we can't just increment by 1 because some objects may need to create several elements (such as box + text)
+          // also we can't just have a counter instead of this field because groups may not be consecutive
+          i += 100;
+        }
       }
     }
 

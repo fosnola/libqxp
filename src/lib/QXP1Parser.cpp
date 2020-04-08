@@ -7,8 +7,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include <iostream>
-
 #include "QXP1Parser.h"
 
 #include "QXP1Header.h"
@@ -95,7 +93,6 @@ bool QXP1Parser::parsePages(const std::shared_ptr<librevenge::RVNGInputStream> &
   QXPDummyCollector dummyCollector;
   for (unsigned i = 0; i < 2+m_header->pages(); ++i)
   {
-    std::cout << i << "/" << 2+m_header->pages() << "\n";
     // don't output master pages, everything is included in normal pages
     QXPCollector &coll = i < 2 ? dummyCollector : collector;
 
@@ -106,7 +103,7 @@ bool QXP1Parser::parsePages(const std::shared_ptr<librevenge::RVNGInputStream> &
     {
       last = parseObject(stream, coll);
     }
-    coll.endPage();
+    coll.endPage(false);
   }
 
   return true;
@@ -226,12 +223,11 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
     QXP_DEBUG_MSG(("Unknown object type %u\n", type));
     throw ParseError();
   }
-  std::cout << "Type=" << type << "[" << std::hex << input->tell()-1 << std::dec << "]\n";
   const unsigned transVal = readU8(input);
   bool transparent = (transVal&1)==1;
   // |2: habillage
 
-  object.contentIndex = readU16(input);
+  object.contentIndex = readU16(input, true);
   skip(input, 2); // flags: |0x8000: locked
 
   parseCoordPair(input, object.boundingBox.left, object.boundingBox.top, object.boundingBox.right, object.boundingBox.bottom);
@@ -259,7 +255,7 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
   case ShapeType::CORNERED_RECTANGLE:
   case ShapeType::OVAL:
     if (object.contentType == ContentType::TEXT)
-      parseText(input, collector, object, lastObject);
+      parseTextBox(input, collector, object, lastObject);
     else
       parsePictureBox(input, collector, object, lastObject);
     break;
@@ -305,7 +301,7 @@ void QXP1Parser::parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &s
   lastObject = readU8(stream);
 }
 
-void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &stream, QXPCollector &collector, QXP1Parser::ObjectHeader const &header, unsigned &lastObject)
+void QXP1Parser::parseTextBox(const std::shared_ptr<librevenge::RVNGInputStream> &stream, QXPCollector &collector, QXP1Parser::ObjectHeader const &header, unsigned &lastObject)
 {
   auto textbox = createBox<TextBox>(header);
   textbox->linkSettings.linkId = header.linkIndex;
@@ -316,15 +312,32 @@ void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &s
   textbox->settings.inset.top =
     textbox->settings.inset.left =
       textbox->settings.inset.right =
-        textbox->settings.inset.bottom = readFraction(stream, true);
+        textbox->settings.inset.bottom = double(readU32(stream, true))/double(0x1000000);
   skip(stream, 1); // 0: 0[1]
   textbox->linkSettings.nextLinkedIndex = readU16(stream, be);
-  skip(stream, 9);
-  if (header.linkIndex==0)
+  skip(stream, 4); // some id
+  auto val=readU8(stream);
+  if (val)
     skip(stream, 3);
   if (header.contentIndex==0)
     skip(stream, 12);
-  collector.collectTextBox(textbox);
+  if (header.contentIndex == 0)
+  {
+    collector.collectBox(textbox);
+  }
+  else
+  {
+    if (textbox->linkSettings.offsetIntoText > 0)
+    {
+      textbox->linkSettings.linkedIndex = header.contentIndex;
+    }
+    else
+    {
+      textbox->text = parseText(header.contentIndex, header.linkIndex, collector);
+    }
+
+    collector.collectTextBox(textbox);
+  }
 
   lastObject = readU8(stream);
 }
@@ -339,7 +352,7 @@ void QXP1Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStre
   picturebox->scaleVert = readFraction(stream, true);
   skip(stream, 4); // 0
   auto index=readU32(stream, true);
-  skip(stream, 18); // then 1,0,1,0,0x24,0,0
+  skip(stream, 17); // then 1,0,1,0,0x24,0,0
   lastObject = readU8(stream);
 
   if (index)
@@ -377,13 +390,14 @@ Frame QXP1Parser::readFrame(const std::shared_ptr<librevenge::RVNGInputStream> &
 {
   Frame frame;
   skip(stream, 1);
-  frame.width = double(readU16(stream, true))/double(0x8000);
-  const double shade = readU8(stream);
+  frame.width = double(readU8(stream));
+  skip(stream, 2);
+  const unsigned shadeId = readU8(stream);
   const unsigned colorId = readU8(stream);
-  frame.color = getColor(colorId).applyShade(shade);
+  frame.color = getColor(colorId).applyShade(getShade(shadeId));
   const unsigned styleIndex = readU8(stream);
   const bool isStripe = (styleIndex >> 7) == 1;
-  if (isStripe)
+  if (!isStripe)
     frame.lineStyle = getLineStyle(styleIndex);
   else
     frame.width=0;
