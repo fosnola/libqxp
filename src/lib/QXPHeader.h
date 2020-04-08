@@ -51,6 +51,10 @@ public:
 
   bool isLittleEndian() const;
   bool isBigEndian() const;
+  virtual bool hasBigIndex() const
+  {
+    return m_version >= QXPVersion::QXP_31_MAC;
+  }
   unsigned version() const;
   const char *encoding() const;
 

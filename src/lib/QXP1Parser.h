@@ -24,6 +24,37 @@ public:
 
   static void adjust(double &pos, unsigned adjustment);
 
+  enum class ShapeType
+  {
+    UNKNOWN,
+    LINE,
+    ORTHOGONAL_LINE,
+    RECTANGLE,
+    CORNERED_RECTANGLE,
+    OVAL
+  };
+
+  struct ObjectHeader
+  {
+    boost::optional<Fill> fill;
+
+    unsigned contentIndex;
+    unsigned linkId;
+
+
+    ContentType contentType;
+    ShapeType shapeType;
+
+    Rect boundingBox;
+
+    BoxType boxType;
+
+    ObjectHeader()
+      : fill(), contentIndex(0), linkId(0),
+        contentType(ContentType::UNKNOWN), shapeType(ShapeType::UNKNOWN), boundingBox(),
+        boxType(BoxType::UNKNOWN)
+    { }
+  };
 private:
   bool parseDocument(const std::shared_ptr<librevenge::RVNGInputStream> &docStream, QXPCollector &collector) override;
   bool parsePages(const std::shared_ptr<librevenge::RVNGInputStream> &pagesStream, QXPCollector &collector) override;

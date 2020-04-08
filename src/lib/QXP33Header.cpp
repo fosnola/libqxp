@@ -16,6 +16,7 @@ namespace libqxp
 
 QXP33Header::QXP33Header(const boost::optional<QXPDocument::Type> &fileType)
   : QXP3HeaderBase(fileType)
+  , m_isBigIdx(boost::none)
   , m_pagesCount(0)
   , m_masterPagesCount(0)
   , m_seed(0)

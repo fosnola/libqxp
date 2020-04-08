@@ -24,6 +24,7 @@ QXP1Header::QXP1Header()
 bool QXP1Header::load(const std::shared_ptr<librevenge::RVNGInputStream> &input)
 {
   m_proc = 'M';
+  input->seek(0, librevenge::RVNG_SEEK_SET);
   m_version = readU16(input, true);
   skip(input, 152);
   m_pages = readU16(input, true);

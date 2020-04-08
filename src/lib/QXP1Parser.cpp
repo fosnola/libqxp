@@ -7,6 +7,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#include <iostream>
+
 #include "QXP1Parser.h"
 
 #include "QXP1Header.h"
@@ -59,19 +61,24 @@ bool QXP1Parser::parsePages(const std::shared_ptr<librevenge::RVNGInputStream> &
   page.pageSettings[0].offset.bottom = m_header->pageHeight();
   page.pageSettings[0].offset.right = m_header->pageWidth();
 
-  for (unsigned i = 0; i != m_header->pages(); ++i)
+  QXPDummyCollector dummyCollector;
+  for (unsigned i = 0; i < 2+m_header->pages(); ++i)
   {
+    std::cout << i << "/" << 2+m_header->pages() << "\n";
+    // don't output master pages, everything is included in normal pages
+    QXPCollector &coll = i < 2 ? dummyCollector : collector;
+
     const bool empty = parsePage(stream);
-    collector.startPage(page);
+    coll.startPage(page);
     bool last = !empty;
     while (!last)
     {
-      last = parseObject(stream, collector);
+      last = parseObject(stream, coll);
     }
-    collector.endPage();
+    coll.endPage();
   }
 
-  return false;
+  return true;
 }
 
 CharFormat QXP1Parser::parseCharFormat(const std::shared_ptr<librevenge::RVNGInputStream> &stream)
@@ -135,24 +142,14 @@ std::shared_ptr<HJ> QXP1Parser::parseHJ(const std::shared_ptr<librevenge::RVNGIn
 
 bool QXP1Parser::parsePage(const std::shared_ptr<librevenge::RVNGInputStream> &input)
 {
-  skip(input, 15);
-  const unsigned empty = readU8(input);
-  switch (empty)
-  {
-  case 1:
-    return false;
-  case 2:
-    return true;
-  default:
-    QXP_DEBUG_MSG(("QXP1Parser::parsePage: unknown 'is empty' value %d, cannot continue\n", empty));
-    throw ParseError();
-  }
+  skip(input, 16);
+  return true;
 }
 
 bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector)
 {
   const unsigned type = readU8(input);
-
+  std::cout << "Type=" << type << "[" << std::hex << input->tell()-1 << std::dec << "]\n";
   bool transparent = false;
   const unsigned transVal = readU8(input);
   switch (transVal)
@@ -188,6 +185,7 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
     parseLine(input, collector, bbox, color, transparent);
     break;
   case 3:
+  case 0xfd:
     parseText(input, collector, bbox, color, transparent, contentIndex, textOffset, linkId);
     break;
   case 4:
@@ -234,7 +232,11 @@ void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &i
   (void) textOffset;
   (void) linkID;
 
-  skip(input, 40);
+  skip(input, 28);
+  if (linkID==0)
+    skip(input, 3);
+  if (content==0)
+    skip(input, 12);
 }
 
 void QXP1Parser::parsePicture(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, const Rect &bbox, const Color &color, bool transparent)
@@ -244,7 +246,7 @@ void QXP1Parser::parsePicture(const std::shared_ptr<librevenge::RVNGInputStream>
   (void) color;
   (void) transparent;
 
-  skip(input, 54);
+  skip(input, 45);
 }
 
 void QXP1Parser::parseCoordPair(const std::shared_ptr<librevenge::RVNGInputStream> &input, double &x1, double &y1, double &x2, double &y2)

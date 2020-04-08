@@ -209,6 +209,11 @@ void insertText(librevenge::RVNGDrawingInterface *painter, const RVNGString &tex
       break;
     default:
       wasSpace = false;
+      if (utf8Char[0]>=0 && utf8Char[0]<=0x1f)
+      {
+        QXP_DEBUG_MSG(("insertText[QPXContentCollector.cpp]: bad character=%x\n",unsigned(utf8Char[0])));
+        break;
+      }
       curText.append(utf8Char);
       break;
     }

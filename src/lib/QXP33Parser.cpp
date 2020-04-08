@@ -66,6 +66,19 @@ QXP33Parser::QXP33Parser(const std::shared_ptr<librevenge::RVNGInputStream> &inp
   : QXPParser(input, painter, header)
   , m_header(header)
 {
+  if (m_header && m_input)
+  {
+    if (m_header->version()==QXP_33 && m_header->isBigEndian())
+    {
+      m_input->seek(26, librevenge::RVNG_SEEK_SET);
+      m_header->setBigIndex((readU8(m_input)&0x80)==0x80);
+    }
+    else if (m_header->version()==QXP_31 && m_header->isLittleEndian())
+    {
+      m_input->seek(26, librevenge::RVNG_SEEK_SET);
+      m_header->setBigIndex((readU8(m_input)&0x1)==0x1);
+    }
+  }
 }
 
 bool QXP33Parser::parseDocument(const std::shared_ptr<librevenge::RVNGInputStream> &docStream, QXPCollector &collector)
@@ -577,7 +590,7 @@ void QXP33Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStr
   skip(stream, 4);
 
   unsigned runaroundId = 0;
-  unsigned clipId = 0;
+  unsigned fileInfoId = 0;
 
   QXP33Parser::ObjectHeader header(objHeader);
 
@@ -585,7 +598,7 @@ void QXP33Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStr
   {
     runaroundId = readU32(stream, be);
     skip(stream, 2);
-    clipId = readU32(stream, be);
+    fileInfoId = readU32(stream, be);
     skip(stream, 14);
   }
   else
@@ -611,10 +624,11 @@ void QXP33Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStr
         break;
       }
     }
-    else if (header.shapeType == ShapeType::POLYGON)
-    {
+    else
       skip(stream, 5);
-    }
+    skip(stream, 1);
+    fileInfoId=readU32(stream, be);
+    skip(stream, 14);
   }
 
   auto picturebox = createBox<PictureBox>(header);
@@ -626,23 +640,31 @@ void QXP33Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStr
   picturebox->offsetTop = readFraction(stream, be);
   picturebox->scaleHor = readFraction(stream, be);
   picturebox->scaleVert = readFraction(stream, be);
-  skip(stream, 30);
+  skip(stream, 22);
+  unsigned unknownId = readU32(stream, be);
+  skip(stream, 4);
 
   if (header.shapeType == ShapeType::POLYGON)
   {
     picturebox->customPoints = readPolygonData(stream);
   }
 
+  if (fileInfoId != 0)
+  {
+    const unsigned clength = readU32(stream, be);
+    skip(stream, clength);
+  }
+
   if (runaroundId != 0)
   {
     const unsigned rlength = readU32(stream, be);
     skip(stream, rlength);
+  }
 
-    if (clipId != 0)
-    {
-      const unsigned clength = readU32(stream, be);
-      skip(stream, clength);
-    }
+  if (unknownId != 0)
+  {
+    const unsigned rlength = readU32(stream, be);
+    skip(stream, rlength);
   }
 
   collector.collectBox(picturebox);

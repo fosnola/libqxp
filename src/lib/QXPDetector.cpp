@@ -16,6 +16,7 @@
 #include "QXPMacFileParser.h"
 #include "QXPParser.h"
 
+#include <iostream>
 namespace libqxp
 {
 
@@ -118,6 +119,24 @@ void QXPDetector::detect(const std::shared_ptr<librevenge::RVNGInputStream> &inp
     }
   }
 
+  if (!bool(m_header) && bool(docStream))
+  {
+    docStream->seek(0, librevenge::RVNG_SEEK_SET);
+    unsigned const vers=readU16(docStream, true);
+
+    if (vers==QXP_1 && readU16(docStream, true)==vers)
+    {
+      m_header = std::make_shared<QXP1Header>();
+      // check if we can retrieve the block parser
+      docStream->seek(0, librevenge::RVNG_SEEK_SET);
+      m_header->load(docStream);
+      QXPBlockParser blockParser(docStream, m_header);
+      if (!blockParser.getChain(3))
+        m_header.reset();
+      else
+        m_input=docStream;
+    }
+  }
   if (bool(m_header))
   {
     m_input->seek(0, librevenge::RVNG_SEEK_SET);

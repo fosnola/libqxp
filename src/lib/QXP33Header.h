@@ -34,7 +34,17 @@ public:
   uint16_t increment() const;
   const QXPDocumentProperties &documentProperties() const;
 
+  bool hasBigIndex() const final
+  {
+    return boost::get_optional_value_or(m_isBigIdx, m_version >= QXPVersion::QXP_31_MAC);
+  }
+  void setBigIndex(bool bigIndex)
+  {
+    m_isBigIdx=bigIndex;
+  }
+
 private:
+  boost::optional<bool> m_isBigIdx;
   uint16_t m_pagesCount;
   uint16_t m_masterPagesCount;
   uint16_t m_seed;

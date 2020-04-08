@@ -68,7 +68,7 @@ std::shared_ptr<RVNGInputStream> QXPBlockParser::getBlock(const uint32_t index)
 
 std::shared_ptr<RVNGInputStream> QXPBlockParser::getChain(const uint32_t index)
 {
-  bool bigIdx = m_header->version() >= QXPVersion::QXP_31_MAC;
+  bool bigIdx = m_header->hasBigIndex();
 
   vector<unsigned char> chain;
   bool isBig = false;

@@ -284,10 +284,10 @@ std::vector<PageSettings> QXPParser::parsePageSettings(const std::shared_ptr<lib
     skip(stream, m_header->version() >= QXP_4 ? 12 : 8);
   }
 
-  for (unsigned i = 0; i <= count; ++i)
+  for (unsigned i = 0; i < 2*count+2; ++i)
   {
     const unsigned length = readU32(stream, be);
-    skip(stream, length + 4);
+    skip(stream, length);
   }
 
   if (!be)
@@ -341,7 +341,17 @@ Gradient QXPParser::readGradient(const std::shared_ptr<librevenge::RVNGInputStre
   Gradient gradient;
   gradient.color1 = color1;
 
-  skip(stream, m_header->version() >= QXP_4 ? 20 : 14);
+  uint32_t size=readU32(stream, be);
+  if (size != (m_header->version() >= QXP_4 ? 0x24 : 0x1e))
+  {
+    QXP_DEBUG_MSG(("QXPParser::readGradient: unknown size=%x\n", size));
+    skip(stream, size);
+    // pick a default
+    gradient.type = GradientType::LINEAR;
+    gradient.color2 = gradient.color1;
+    return gradient;
+  }
+  skip(stream, m_header->version() >= QXP_4 ? 16 : 10);
 
   const uint8_t type = readU16(stream, be) & 0xff;
   switch (type)
