@@ -302,7 +302,7 @@ std::vector<PageSettings> QXPParser::parsePageSettings(const std::shared_ptr<lib
 
 void QXPParser::parsePicture(unsigned index, QXPCollector &collector)
 {
-  if (!index || !be) // the Windows picture format is not understood
+  if (!index)
     return;
   try
   {
@@ -310,14 +310,51 @@ void QXPParser::parsePicture(unsigned index, QXPCollector &collector)
     if (pictureStream)
     {
       uint32_t pictSize=readU32(pictureStream, be);
-      const unsigned char *readData;
       unsigned long sizeRead;
-      if (pictSize<10 || (readData=pictureStream->read(static_cast<unsigned long>(pictSize), sizeRead)) == nullptr || long(sizeRead)!=pictSize)
+      bool ok=pictSize>10;
+      // WINDOWS: some container, looks for BM and WMF picture at pos 0x32
+      // MAC: basic Apple picture file
+      if (!be)
+      {
+        ok=pictSize>0x30;
+        if (ok)
+        {
+          // look for a picture at position 0x32
+          // 4-7: pict size
+          // 8-23: rectangle size,
+          // 24-25: 0: BM, 1: WMF ?
+          // 25-26: num plane if BM
+          // then 0?
+          skip(pictureStream, 0x2e);
+          uint16_t signature=readU16(pictureStream, be);
+          if (signature==0x4d42)   // BM
+          {
+            uint32_t realPictSize=readU32(pictureStream, be);
+            ok=realPictSize<=pictSize+0x2e;
+            if (ok)
+            {
+              pictSize=realPictSize;
+              pictureStream->seek(0x32, librevenge::RVNG_SEEK_SET);
+            }
+          }
+          else if (signature==0xcdd7)   // WMF
+          {
+            ok=readU16(pictureStream, be)==0x9ac6;
+            if (ok)
+            {
+              pictSize-=0x32;
+              pictureStream->seek(0x32, librevenge::RVNG_SEEK_SET);
+            }
+          }
+          else ok=false;
+        }
+      }
+      const unsigned char *readData;
+      if (!ok || (readData=pictureStream->read(static_cast<unsigned long>(pictSize), sizeRead)) == nullptr || long(sizeRead)!=pictSize)
       {
         QXP_DEBUG_MSG(("Failed to read picture %u\n", index));
         return;
       }
-
       librevenge::RVNGBinaryData data;
       data.append(readData, sizeRead);
       collector.collectPicture(index, data);
