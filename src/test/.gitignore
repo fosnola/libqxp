@@ -1,0 +1,11 @@
+Makefile
+Makefile.in
+test
+detection
+.libs
+.deps
+*.lo
+*.log
+*.o
+*.trs
+*~

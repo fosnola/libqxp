@@ -1,0 +1,9 @@
+.deps
+.libs
+*.lo
+*.la
+Makefile
+Makefile.in
+qxp2raw
+qxp2raw.exe
+qxp2raw.rc

@@ -1,0 +1,9 @@
+.deps
+.libs
+*.lo
+*.la
+Makefile
+Makefile.in
+qxp2svg
+qxp2svg.exe
+qxp2svg.rc

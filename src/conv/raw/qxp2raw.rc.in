@@ -1,0 +1,31 @@
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+  FILEVERSION @QXP_MAJOR_VERSION@,@QXP_MINOR_VERSION@,@QXP_MICRO_VERSION@,BUILDNUMBER
+  PRODUCTVERSION @QXP_MAJOR_VERSION@,@QXP_MINOR_VERSION@,@QXP_MICRO_VERSION@,0
+  FILEFLAGSMASK 0
+  FILEFLAGS 0
+  FILEOS VOS__WINDOWS32
+  FILETYPE VFT_APP
+  FILESUBTYPE VFT2_UNKNOWN
+  BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+      BLOCK "040904B0"
+      BEGIN
+	VALUE "CompanyName", "The libqxp developer community"
+	VALUE "FileDescription", "qxp2text"
+	VALUE "FileVersion", "@QXP_MAJOR_VERSION@.@QXP_MINOR_VERSION@.@QXP_MICRO_VERSION@.BUILDNUMBER"
+	VALUE "InternalName", "qxp2raw"
+	VALUE "LegalCopyright", "Copyright (C) 2017 David Tardon"
+	VALUE "OriginalFilename", "qxp2raw.exe"
+	VALUE "ProductName", "libqxp"
+	VALUE "ProductVersion", "@QXP_MAJOR_VERSION@.@QXP_MINOR_VERSION@.@QXP_MICRO_VERSION@"
+      END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+      VALUE "Translation", 0x409, 1200
+    END
+  END
+
