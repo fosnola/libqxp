@@ -366,9 +366,10 @@ struct LinkedTextSettings
   unsigned linkedIndex;
   unsigned nextLinkedIndex;
   boost::optional<unsigned> textLength;
+  unsigned unknownIndex;
 
   LinkedTextSettings()
-    : linkId(0), offsetIntoText(0), linkedIndex(0), nextLinkedIndex(0), textLength()
+    : linkId(0), offsetIntoText(0), linkedIndex(0), nextLinkedIndex(0), textLength(), unknownIndex(0)
   { }
 };
 

@@ -964,8 +964,8 @@ void QXP4Parser::parseTextBox(const std::shared_ptr<librevenge::RVNGInputStream>
   readTextSettings(stream, textbox->settings);
   readLinkedTextSettings(stream, textbox->linkSettings);
   skip(stream, 12);
-
-  skipTextObjectEnd(stream, header, textbox->linkSettings);
+  if (textbox->linkSettings.unknownIndex==0)
+    skipTextObjectEnd(stream, header, textbox->linkSettings);
 
   if (header.contentIndex == 0)
   {
@@ -1044,7 +1044,7 @@ bool QXP4Parser::readRunaround(const std::shared_ptr<librevenge::RVNGInputStream
 void QXP4Parser::readLinkedTextSettings(const std::shared_ptr<librevenge::RVNGInputStream> &stream, LinkedTextSettings &settings)
 {
   settings.nextLinkedIndex = readU32(stream, be);
-  skip(stream, 4);
+  settings.unknownIndex = readU32(stream, be);
 }
 
 void QXP4Parser::readTextSettings(const std::shared_ptr<librevenge::RVNGInputStream> &stream, TextSettings &settings)
