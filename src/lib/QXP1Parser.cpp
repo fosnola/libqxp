@@ -34,6 +34,43 @@ double getShade(const unsigned shadeId)
     return 1.0;
 }
 
+#if 0
+template<typename T>
+shared_ptr<T> createBox(const QXP1Parser::ObjectHeader &header)
+{
+  auto box = make_shared<T>();
+  box->boundingBox = header.boundingBox;
+  box->runaround = header.runaround;
+  box->boxType = header.boxType;
+  box->fill = header.fill;
+  box->cornerType = header.cornerType;
+  box->cornerRadius = header.cornerRadius;
+  box->rotation = header.rotation;
+  return box;
+}
+#endif
+
+template<typename T>
+shared_ptr<T> createLine(const QXP1Parser::ObjectHeader &header)
+{
+  auto line = make_shared<T>();
+  line->boundingBox = header.boundingBox;
+  //line->runaround = header.runaround;
+  //line->rotation = header.rotation;
+  if (auto fill = header.fill.get_ptr())
+  {
+    if (auto color = boost::get<Color>(fill))
+    {
+      line->style.color = *color;
+    }
+    else
+    {
+      QXP_DEBUG_MSG(("Unsupported line fill type\n"));
+    }
+  }
+  return line;
+}
+
 }
 
 QXP1Parser::QXP1Parser(const std::shared_ptr<librevenge::RVNGInputStream> &input, librevenge::RVNGDrawingInterface *painter, const std::shared_ptr<QXP1Header> &header)
@@ -207,7 +244,6 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
   object.contentIndex = readU16(input);
   skip(input, 2); // flags: |0x8000: locked
 
-  Rect bbox;
   parseCoordPair(input, object.boundingBox.left, object.boundingBox.top, object.boundingBox.right, object.boundingBox.bottom);
 
   object.textOffset = readU32(input, true) >> 8;
@@ -216,7 +252,7 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
   const unsigned shadeId = readU8(input);
   const unsigned colorId = readU8(input);
   const auto &color = getColor(colorId).applyShade(getShade(shadeId));
-  if (!transparent)
+  if (type<2 || !transparent)
   {
     object.fill = color;
   }
@@ -257,10 +293,24 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
 
 void QXP1Parser::parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
 {
-  (void) collector;
-  (void) header;
+  auto line = createLine<Line>(header);
 
-  skip(input, 25);
+  Rect &bbox = line->boundingBox;
+  parseCoordPair(input, bbox.left, bbox.top, bbox.right, bbox.bottom);
+  skip(input, 2); // 1?
+  line->style.width = double(readU16(input, true))/double(0x8000);
+  const unsigned styleIndex = readU8(input);
+  const bool isStripe = (styleIndex >> 7) == 1;
+  if (!isStripe)
+  {
+    line->style.lineStyle = getLineStyle(styleIndex);
+  }
+
+  const uint8_t arrowType = readU8(input);
+  setArrow(arrowType, line->style);
+  collector.collectLine(line);
+
+  skip(input, 3);
 }
 
 void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
