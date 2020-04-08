@@ -23,6 +23,7 @@ enum QXPVersion
 {
   UNKNOWN = 0,
   QXP_1 = 0x20, // NOTE: this is 1.10L, but we use for all 1.x versions, as we've no idea if there are any differences anyway
+  QXP_2 = 0x26,
   QXP_31_MAC = 0x39,
   QXP_31 = 0x3e,
   QXP_33 = 0x3f,

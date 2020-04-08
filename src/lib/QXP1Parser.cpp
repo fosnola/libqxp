@@ -7,6 +7,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#include <iostream>
+
 #include "QXP1Parser.h"
 
 #include "QXP1Header.h"
@@ -21,16 +23,6 @@ using std::shared_ptr;
 
 namespace
 {
-
-double getShade(const unsigned shadeId)
-{
-  if (shadeId < 3)
-    return 0.1 * shadeId;
-  else if (shadeId < 6)
-    return 0.2 * (shadeId - 1);
-  else
-    return 1.0;
-}
 
 template<typename T>
 shared_ptr<T> createBox(const QXP1Parser::ObjectHeader &header)
@@ -76,8 +68,27 @@ void QXP1Parser::adjust(double &pos, unsigned adjustment)
   pos += double(adjustment - 0x8000) / 0x10000;
 }
 
+double QXP1Parser::getShade(const unsigned shadeId) const
+{
+  if (m_header->version()>=QXPVersion::QXP_2)
+    return double(shadeId)/100;
+  if (shadeId < 3)
+    return 0.1 * shadeId;
+  else if (shadeId < 6)
+    return 0.2 * (shadeId - 1);
+  else
+    return 1.0;
+}
+
 bool QXP1Parser::parseDocument(const std::shared_ptr<librevenge::RVNGInputStream> &docStream, QXPCollector &)
 {
+  if (m_header->version()>=QXPVersion::QXP_2)
+  {
+    parseFonts(docStream);
+    parseColors(docStream);
+    skipRecord(docStream); // don't need stylesheets, everything is included in the current style
+    parseHJs(docStream);
+  }
   parseCharFormats(docStream);
   parseParagraphFormats(docStream);
   return true;
@@ -107,6 +118,36 @@ bool QXP1Parser::parsePages(const std::shared_ptr<librevenge::RVNGInputStream> &
   }
 
   return true;
+}
+
+void QXP1Parser::parseColors(const std::shared_ptr<librevenge::RVNGInputStream> &stream)
+{
+  const unsigned end = readRecordEndOffset(stream);
+
+  try
+  {
+    skip(stream, 1);
+    unsigned count = readU8(stream);
+    skip(stream, 32);
+    for (unsigned i = 0; i < count; ++i)
+    {
+      unsigned id = readU8(stream);
+      skip(stream, 1);
+      Color color;
+      color.red = readColorComp(stream);
+      color.green = readColorComp(stream);
+      color.blue = readColorComp(stream);
+      m_colors[id] = color;
+      skip(stream, 40);
+      readName(stream); // skip
+    }
+  }
+  catch (...)
+  {
+    QXP_DEBUG_MSG(("Failed to parse colors, offset %ld\n", stream->tell()));
+  }
+
+  seek(stream, end);
 }
 
 CharFormat QXP1Parser::parseCharFormat(const std::shared_ptr<librevenge::RVNGInputStream> &stream)
@@ -139,6 +180,17 @@ CharFormat QXP1Parser::parseCharFormat(const std::shared_ptr<librevenge::RVNGInp
   result.baselineShift = -double(readU16(stream, true))/double(0x8000);
 
   return result;
+}
+
+std::shared_ptr<HJ> QXP1Parser::parseHJ(const std::shared_ptr<librevenge::RVNGInputStream> &stream)
+{
+  auto hj = make_shared<HJ>();
+
+  skip(stream, 4);
+  parseHJProps(stream, *hj);
+  readName(stream);
+
+  return hj;
 }
 
 ParagraphFormat QXP1Parser::parseParagraphFormat(const std::shared_ptr<librevenge::RVNGInputStream> &stream)
@@ -174,11 +226,6 @@ ParagraphFormat QXP1Parser::parseParagraphFormat(const std::shared_ptr<libreveng
   return result;
 }
 
-std::shared_ptr<HJ> QXP1Parser::parseHJ(const std::shared_ptr<librevenge::RVNGInputStream> &)
-{
-  return std::shared_ptr<HJ>();
-}
-
 bool QXP1Parser::parsePage(const std::shared_ptr<librevenge::RVNGInputStream> &input)
 {
   // 0: num page
@@ -190,38 +237,76 @@ bool QXP1Parser::parsePage(const std::shared_ptr<librevenge::RVNGInputStream> &i
 
 bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector)
 {
+  std::cout << std::hex << input->tell() << std::dec << "\n";
   ObjectHeader object;
   const unsigned type = readU8(input);
-  switch (type)
+  if (m_header->version()>=QXPVersion::QXP_2)
   {
-  case 0:
-    object.shapeType = ShapeType::LINE;
-    object.contentType = ContentType::NONE;
-    break;
-  case 1:
-    object.shapeType = ShapeType::ORTHOGONAL_LINE;
-    object.contentType = ContentType::NONE;
-    break;
-  case 3:
-  case 0xfd: // main textbox
-    object.shapeType = ShapeType::RECTANGLE;
-    object.contentType = ContentType::TEXT;
-    break;
-  case 4:
-    object.shapeType = ShapeType::RECTANGLE;
-    object.contentType = ContentType::PICTURE;
-    break;
-  case 5:
-    object.shapeType = ShapeType::CORNERED_RECTANGLE;
-    object.contentType = ContentType::PICTURE;
-    break;
-  case 6:
-    object.shapeType = ShapeType::OVAL;
-    object.contentType = ContentType::PICTURE;
-    break;
-  default:
-    QXP_DEBUG_MSG(("Unknown object type %u\n", type));
-    throw ParseError();
+    switch (type)
+    {
+    case 0:
+      object.shapeType = ShapeType::LINE;
+      object.contentType = ContentType::NONE;
+      break;
+    case 1:
+      object.shapeType = ShapeType::ORTHOGONAL_LINE;
+      object.contentType = ContentType::NONE;
+      break;
+    case 3:
+    case 0xfd: // main textbox
+      object.shapeType = ShapeType::RECTANGLE;
+      object.contentType = ContentType::TEXT;
+      break;
+    case 0xb:
+      object.shapeType = ShapeType::RECTANGLE;
+      object.contentType = ContentType::PICTURE;
+      break;
+    case 0xc:
+      object.shapeType = ShapeType::CORNERED_RECTANGLE;
+      object.contentType = ContentType::PICTURE;
+      break;
+    case 0xd:
+      object.shapeType = ShapeType::OVAL;
+      object.contentType = ContentType::PICTURE;
+      break;
+    default:
+      QXP_DEBUG_MSG(("Unknown object type %u\n", type));
+      throw ParseError();
+    }
+  }
+  else
+  {
+    switch (type)
+    {
+    case 0:
+      object.shapeType = ShapeType::LINE;
+      object.contentType = ContentType::NONE;
+      break;
+    case 1:
+      object.shapeType = ShapeType::ORTHOGONAL_LINE;
+      object.contentType = ContentType::NONE;
+      break;
+    case 3:
+    case 0xfd: // main textbox
+      object.shapeType = ShapeType::RECTANGLE;
+      object.contentType = ContentType::TEXT;
+      break;
+    case 4:
+      object.shapeType = ShapeType::RECTANGLE;
+      object.contentType = ContentType::PICTURE;
+      break;
+    case 5:
+      object.shapeType = ShapeType::CORNERED_RECTANGLE;
+      object.contentType = ContentType::PICTURE;
+      break;
+    case 6:
+      object.shapeType = ShapeType::OVAL;
+      object.contentType = ContentType::PICTURE;
+      break;
+    default:
+      QXP_DEBUG_MSG(("Unknown object type %u\n", type));
+      throw ParseError();
+    }
   }
   const unsigned transVal = readU8(input);
   bool transparent = (transVal&1)==1;
@@ -353,6 +438,8 @@ void QXP1Parser::parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStre
   skip(stream, 4); // 0
   auto index=readU32(stream, true);
   skip(stream, 17); // then 1,0,1,0,0x24,0,0
+  if (m_header->version()>=QXPVersion::QXP_2)
+    skip(stream, 10);
   lastObject = readU8(stream);
 
   if (index)
@@ -404,6 +491,16 @@ Frame QXP1Parser::readFrame(const std::shared_ptr<librevenge::RVNGInputStream> &
   return frame;
 }
 
+std::string QXP1Parser::readName(const std::shared_ptr<librevenge::RVNGInputStream> &stream)
+{
+  const long start = stream->tell();
+  auto name = readPlatformString(stream, true);
+  if ((stream->tell() - start) % 2 == 1)
+  {
+    skip(stream, 1);
+  }
+  return name;
+}
 }
 
 /* vim:set shiftwidth=2 softtabstop=2 expandtab: */

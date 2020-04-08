@@ -46,6 +46,10 @@ public:
     {
     case QXPVersion::QXP_1:
       return std::make_shared<QXP1Header>();
+    case QXPVersion::QXP_2:
+#ifdef DEBUG
+      return std::make_shared<QXP1Header>();
+#endif
     case QXPVersion::QXP_31_MAC:
     case QXPVersion::QXP_31:
     case QXPVersion::QXP_33:
@@ -126,7 +130,7 @@ void QXPDetector::detect(const std::shared_ptr<librevenge::RVNGInputStream> &inp
     docStream->seek(0, librevenge::RVNG_SEEK_SET);
     unsigned const vers=readU16(docStream, true);
 
-    if (vers==QXP_1 && readU16(docStream, true)==vers)
+    if ((vers==QXP_1 || vers==QXP_2) && readU16(docStream, true)==vers)
     {
       m_header = std::make_shared<QXP1Header>();
       // detection is very weak, check if we can retrieve the main
