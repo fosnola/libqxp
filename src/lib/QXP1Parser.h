@@ -68,11 +68,11 @@ private:
   ParagraphFormat parseParagraphFormat(const std::shared_ptr<librevenge::RVNGInputStream> &stream) override;
 
   bool parsePage(const std::shared_ptr<librevenge::RVNGInputStream> &input);
-  bool parseObject(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector);
+  bool parseObject(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, unsigned defZIndex);
 
-  void parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header, unsigned &lastObject);
-  void parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header, unsigned &lastObject);
-  void parseTextBox(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header, unsigned &lastObject);
+  void parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header, unsigned defZIndex, unsigned &lastObject);
+  void parsePictureBox(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header, unsigned defZIndex, unsigned &lastObject);
+  void parseTextBox(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header, unsigned defZIndex, unsigned &lastObject);
 
   double getShade(const unsigned shadeId) const;
   void parseCoordPair(const std::shared_ptr<librevenge::RVNGInputStream> &input, double &x1, double &y1, double &x2, double &y2);

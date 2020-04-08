@@ -37,7 +37,7 @@ public:
   void endDocument() override;
 
   void startPage(const Page &page) override;
-  void endPage(bool reverseZIndex=true) override;
+  void endPage() override;
 
   void collectDocumentProperties(const QXPDocumentProperties &props) override;
 
@@ -150,7 +150,7 @@ private:
     return collectedObj;
   }
 
-  void draw(bool force = false, bool reverseZIndex=true);
+  void draw(bool force = false);
 
   void collectTextObject(const std::shared_ptr<TextObject> &textObj, CollectedPage &page);
   void updateLinkedTexts();

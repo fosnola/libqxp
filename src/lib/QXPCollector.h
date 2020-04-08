@@ -39,7 +39,7 @@ public:
   virtual void endDocument() { }
 
   virtual void startPage(const Page &) { }
-  virtual void endPage(bool = true) { }
+  virtual void endPage() { }
 
   virtual void collectDocumentProperties(const QXPDocumentProperties &) { }
 

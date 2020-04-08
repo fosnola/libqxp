@@ -431,7 +431,7 @@ Gradient QXPParser::readGradient(const std::shared_ptr<librevenge::RVNGInputStre
 HorizontalAlignment QXPParser::readHorAlign(const std::shared_ptr<librevenge::RVNGInputStream> &stream)
 {
   const uint8_t align = readU8(stream);
-  switch (align)
+  switch (align&7)
   {
   default:
     QXP_DEBUG_MSG(("Unknown hor. align %u\n", align));
