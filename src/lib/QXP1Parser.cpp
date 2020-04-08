@@ -180,7 +180,7 @@ CharFormat QXP1Parser::parseCharFormat(const std::shared_ptr<librevenge::RVNGInp
   const unsigned shadeId = readU8(stream);
   result.color = getColor(colorId).applyShade(getShade(shadeId));
   skip(stream, 2); // size before
-  result.baselineShift = -double(readU16(stream, true))/double(0x8000);
+  result.baselineShift = -double(readS16(stream, true))/double(0x8000);
 
   return result;
 }
