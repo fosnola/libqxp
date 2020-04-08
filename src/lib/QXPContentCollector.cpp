@@ -641,6 +641,10 @@ void QXPContentCollector::drawPictureBox(const std::shared_ptr<PictureBox> &box,
 void QXPContentCollector::drawRectangle(const std::shared_ptr<Box> &box, const QXPContentCollector::CollectedPage &page)
 {
   const auto bbox = box->boundingBox.shrink(box->frame.width / 2);
+  if (box->cornerRadius>0)
+  {
+    QXP_DEBUG_MSG(("QXPContentCollector::drawRectangle: corner radius ignored\n"));
+  }
   vector<Point> points =
   {
     page.getPoint(bbox.topLeft()),

@@ -172,7 +172,7 @@ void QXP33Parser::parseColors(const std::shared_ptr<librevenge::RVNGInputStream>
 
 CharFormat QXP33Parser::parseCharFormat(const std::shared_ptr<librevenge::RVNGInputStream> &stream)
 {
-  skip(stream, 2);
+  skip(stream, 2); // num used
 
   CharFormat result;
   parseCommonCharFormatProps(stream, result);
@@ -184,7 +184,7 @@ CharFormat QXP33Parser::parseCharFormat(const std::shared_ptr<librevenge::RVNGIn
   const double shade = readFraction(stream, be);
   result.color = getColor(colorId).applyShade(shade);
 
-  skip(stream, 8);
+  skip(stream, 8); // 4:size before, 4:size after
   result.baselineShift = (!m_header->hasBigIndex() ? -1 : 1)*readFraction(stream, be); // checkme
 
   result.isControlChars = readU8(stream) != 0;
@@ -472,7 +472,9 @@ QXP33Parser::ObjectHeader QXP33Parser::parseObjectHeader(const std::shared_ptr<l
 
   if (result.gradientId != 0)
   {
-    result.fill = readGradient(stream, color);
+    Gradient fill = readGradient(stream, color);
+    if (!noColor)
+      result.fill = fill;
   }
 
   result.boundingBox = readObjectBBox(stream);
