@@ -44,6 +44,10 @@ public:
   {
     switch (m_version)
     {
+#ifdef DEBUG
+    case QXPVersion::QXP_1:
+      return std::make_shared<QXP1Header>();
+#endif
     case QXPVersion::QXP_31_MAC:
     case QXPVersion::QXP_31:
     case QXPVersion::QXP_33:

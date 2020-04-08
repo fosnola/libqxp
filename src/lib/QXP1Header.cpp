@@ -26,9 +26,11 @@ bool QXP1Header::load(const std::shared_ptr<librevenge::RVNGInputStream> &input)
   m_proc = 'M';
   input->seek(0, librevenge::RVNG_SEEK_SET);
   m_version = readU16(input, true);
-  skip(input, 152);
+  skip(input, 152); // version2[2], printer info[120] + begin prefs[30]
   m_pages = readU16(input, true);
 
+  // guide size: can be different to the page size
+  //   TODO: read the printer info to retrieve the real page size
   m_pageHeight = readU16(input, true);
   int pageHeightAdj = readU16(input, true);
   m_pageWidth = readU16(input, true);

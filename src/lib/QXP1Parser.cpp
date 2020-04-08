@@ -87,20 +87,28 @@ CharFormat QXP1Parser::parseCharFormat(const std::shared_ptr<librevenge::RVNGInp
 
   skip(stream, 2);
 
-  const int fontIndex = readS16(stream, true);
-  (void) fontIndex;
-  result.fontName = "Helvetica"; // TODO: How to determine font name? Is the list of fonts fixed?
+  const unsigned fontIndex = readU16(stream, true);
+  // see MWAWFontConverter[limwaw] to get more current names
+  char const *(fontNames[]) = { nullptr /* system font*/, nullptr /* appli font */,
+                                "NewYork", "Geneva", "Monaco", "Venice", "London", "Athens", "SanFran", "Toronto", // 2-9
+                                nullptr, "Cairo", "LosAngeles", "Zapf Dingbats", "Bookman", // 10-14
+                                nullptr, "Palatino", nullptr, "Zapf Chancery", nullptr, // 15-19
+                                "Times", "Helvetica", "Courier", "Symbol", "Mobile"
+                              }; // 20-24
+  if (fontIndex<25 && fontNames[fontIndex])
+    result.fontName = fontNames[fontIndex];
+  else
+    result.fontName = "Helvetica";
 
   result.fontSize = readU16(stream, true) / 4.0;
 
   const unsigned flags = readU16(stream, true);
   convertCharFormatFlags(flags, result);
-
-  skip(stream, 2);
-
+  result.horizontalScaling=double(readU16(stream, true))/double(0x800);
   const unsigned colorId = readU8(stream);
   const unsigned shadeId = readU8(stream);
   result.color = getColor(colorId).applyShade(getShade(shadeId));
+  result.baselineShift = -double(readU16(stream, true))/double(0x8000);
 
   return result;
 }
@@ -109,9 +117,12 @@ ParagraphFormat QXP1Parser::parseParagraphFormat(const std::shared_ptr<libreveng
 {
   ParagraphFormat result;
 
-  skip(stream, 3);
+  skip(stream, 3); // flag: keepline, break status...
   result.alignment = readHorAlign(stream);
-  skip(stream, 2);
+  const unsigned hj = readU8(stream);
+  if (hj < m_hjs.size())
+    result.hj = m_hjs[hj];
+  skip(stream, 1); // always 1?
   result.margin.left = readFraction(stream, true);
   result.firstLineIndent = readFraction(stream, true);
   result.margin.right = readFraction(stream, true);
@@ -142,56 +153,88 @@ std::shared_ptr<HJ> QXP1Parser::parseHJ(const std::shared_ptr<librevenge::RVNGIn
 
 bool QXP1Parser::parsePage(const std::shared_ptr<librevenge::RVNGInputStream> &input)
 {
+  // 0: num page
+  // 2: format -1: none, 1:numeric, .. 5: alpha
+  // 3: 0|80, 0, 4, 0, 0, 0, 0, 0, 1
   skip(input, 16);
   return true;
 }
 
 bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector)
 {
+  ObjectHeader object;
   const unsigned type = readU8(input);
-  std::cout << "Type=" << type << "[" << std::hex << input->tell()-1 << std::dec << "]\n";
-  bool transparent = false;
-  const unsigned transVal = readU8(input);
-  switch (transVal)
-  {
-  default:
-    QXP_DEBUG_MSG(("QXP1Parser::parseObject: unexpected 'is transparent' value: %d\n", transVal));
-    QXP_FALLTHROUGH;
-  case 1:
-    transparent = true;
-    break;
-  case 0:
-    transparent = false;
-    break;
-  }
-
-  unsigned contentIndex = readU16(input);
-  skip(input, 2);
-
-  Rect bbox;
-  parseCoordPair(input, bbox.left, bbox.top, bbox.right, bbox.bottom);
-
-  const unsigned textOffset = readU32(input, true) >> 8;
-  skip(input, 8);
-  const unsigned linkId = readU32(input, true);
-  const unsigned shadeId = readU8(input);
-  const unsigned colorId = readU8(input);
-  const auto &color = getColor(colorId).applyShade(getShade(shadeId));
-
   switch (type)
   {
   case 0:
+    object.shapeType = ShapeType::LINE;
+    object.contentType = ContentType::NONE;
+    break;
   case 1:
-    parseLine(input, collector, bbox, color, transparent);
+    object.shapeType = ShapeType::ORTHOGONAL_LINE;
+    object.contentType = ContentType::NONE;
     break;
   case 3:
-  case 0xfd:
-    parseText(input, collector, bbox, color, transparent, contentIndex, textOffset, linkId);
+  case 0xfd: // main textbox
+    object.shapeType = ShapeType::RECTANGLE;
+    object.contentType = ContentType::TEXT;
     break;
   case 4:
+    object.shapeType = ShapeType::RECTANGLE;
+    object.contentType = ContentType::NONE;
+    break;
   case 5:
+    object.shapeType = ShapeType::CORNERED_RECTANGLE;
+    object.contentType = ContentType::NONE;
+    break;
   case 6:
-    parsePicture(input, collector, bbox, color, transparent);
+    object.shapeType = ShapeType::OVAL;
+    object.contentType = ContentType::NONE;
+    break;
+  case 7:
+    object.shapeType = ShapeType::RECTANGLE;
+    object.contentType = ContentType::PICTURE;
+    break;
+  default:
+    QXP_DEBUG_MSG(("Unknown object type %u\n", type));
+    throw ParseError();
+  }
+  std::cout << "Type=" << type << "[" << std::hex << input->tell()-1 << std::dec << "]\n";
+  const unsigned transVal = readU8(input);
+  bool transparent = (transVal&1)==1;
+  // |2: habillage
+
+  object.contentIndex = readU16(input);
+  skip(input, 2); // flags: |0x8000: locked
+
+  Rect bbox;
+  parseCoordPair(input, object.boundingBox.left, object.boundingBox.top, object.boundingBox.right, object.boundingBox.bottom);
+
+  object.textOffset = readU32(input, true) >> 8;
+  skip(input, 8);
+  object.linkIndex = readU32(input, true);
+  const unsigned shadeId = readU8(input);
+  const unsigned colorId = readU8(input);
+  const auto &color = getColor(colorId).applyShade(getShade(shadeId));
+  if (!transparent)
+  {
+    object.fill = color;
+  }
+  switch (object.shapeType)
+  {
+  case ShapeType::LINE: // line
+  case ShapeType::ORTHOGONAL_LINE: // ortho line
+    parseLine(input, collector, object);
+    break;
+  case ShapeType::RECTANGLE:
+    if (object.contentType == ContentType::TEXT)
+      parseText(input, collector, object);
+    else
+      parsePicture(input, collector, object);
+    break;
+  case ShapeType::CORNERED_RECTANGLE:
+  case ShapeType::OVAL:
+    parsePicture(input, collector, object);
     break;
   default:
     QXP_DEBUG_MSG(("QXP1Parser::parseObject: unknown object type %d, cannot continue\n", type));
@@ -212,39 +255,30 @@ bool QXP1Parser::parseObject(const std::shared_ptr<librevenge::RVNGInputStream> 
   }
 }
 
-void QXP1Parser::parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, const Rect &bbox, const Color &color, bool transparent)
+void QXP1Parser::parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
 {
   (void) collector;
-  (void) bbox;
-  (void) color;
-  (void) transparent;
+  (void) header;
 
   skip(input, 25);
 }
 
-void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, const Rect &bbox, const Color &color, bool transparent, unsigned content, unsigned textOffset, unsigned linkID)
+void QXP1Parser::parseText(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
 {
   (void) collector;
-  (void) bbox;
-  (void) color;
-  (void) transparent;
-  (void) content;
-  (void) textOffset;
-  (void) linkID;
+  (void) header;
 
   skip(input, 28);
-  if (linkID==0)
+  if (header.linkIndex==0)
     skip(input, 3);
-  if (content==0)
+  if (header.contentIndex==0)
     skip(input, 12);
 }
 
-void QXP1Parser::parsePicture(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, const Rect &bbox, const Color &color, bool transparent)
+void QXP1Parser::parsePicture(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, QXP1Parser::ObjectHeader const &header)
 {
   (void) collector;
-  (void) bbox;
-  (void) color;
-  (void) transparent;
+  (void) header;
 
   skip(input, 45);
 }

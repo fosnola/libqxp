@@ -39,8 +39,7 @@ public:
     boost::optional<Fill> fill;
 
     unsigned contentIndex;
-    unsigned linkId;
-
+    unsigned linkIndex;
 
     ContentType contentType;
     ShapeType shapeType;
@@ -48,11 +47,12 @@ public:
     Rect boundingBox;
 
     BoxType boxType;
+    unsigned textOffset;
 
     ObjectHeader()
-      : fill(), contentIndex(0), linkId(0),
+      : fill(), contentIndex(0), linkIndex(0),
         contentType(ContentType::UNKNOWN), shapeType(ShapeType::UNKNOWN), boundingBox(),
-        boxType(BoxType::UNKNOWN)
+        boxType(BoxType::UNKNOWN), textOffset(0)
     { }
   };
 private:
@@ -66,9 +66,9 @@ private:
   bool parsePage(const std::shared_ptr<librevenge::RVNGInputStream> &input);
   bool parseObject(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector);
 
-  void parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, const Rect &bbox, const Color &color, bool transparent);
-  void parseText(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, const Rect &bbox, const Color &color, bool transparent, unsigned content, unsigned textOffset, unsigned linkID);
-  void parsePicture(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, const Rect &bbox, const Color &color, bool transparent);
+  void parseLine(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header);
+  void parseText(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header);
+  void parsePicture(const std::shared_ptr<librevenge::RVNGInputStream> &input, QXPCollector &collector, ObjectHeader const &header);
 
   void parseCoordPair(const std::shared_ptr<librevenge::RVNGInputStream> &input, double &x1, double &y1, double &x2, double &y2);
 
