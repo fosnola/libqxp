@@ -766,10 +766,10 @@ void QXPContentCollector::drawTextBox(const std::shared_ptr<TextBox> &textbox, c
   textObjPropList.insert("svg:width", bbox.width(), RVNG_POINT);
   textObjPropList.insert("svg:height", bbox.height(), RVNG_POINT);
 
-  textObjPropList.insert("fo:padding-top", 0, RVNG_POINT);
-  textObjPropList.insert("fo:padding-right", 0, RVNG_POINT);
-  textObjPropList.insert("fo:padding-bottom", 0, RVNG_POINT);
-  textObjPropList.insert("fo:padding-left", 3, RVNG_POINT);
+  textObjPropList.insert("fo:padding-top", textbox->settings.inset.top, RVNG_POINT);
+  textObjPropList.insert("fo:padding-right", textbox->settings.inset.right, RVNG_POINT);
+  textObjPropList.insert("fo:padding-bottom", textbox->settings.inset.bottom, RVNG_POINT);
+  textObjPropList.insert("fo:padding-left", textbox->settings.inset.left, RVNG_POINT);
 
   switch (textbox->settings.verticalAlignment)
   {
